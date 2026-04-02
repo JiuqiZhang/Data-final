@@ -1,0 +1,140 @@
+.app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  background: #0f172a;
+  border-bottom: 1px solid #1e293b;
+  padding: 24px 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(8px);
+}
+
+.headerInner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.title {
+  font-size: 24px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #60a5fa, #a78bfa);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 4px;
+}
+
+.tagline {
+  font-size: 14px;
+  color: #64748b;
+}
+
+.resetBtn {
+  background: transparent;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  color: #94a3b8;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 8px 16px;
+  transition: border-color 0.2s, color 0.2s;
+  white-space: nowrap;
+}
+
+.resetBtn:hover {
+  border-color: #3b82f6;
+  color: #60a5fa;
+}
+
+.main {
+  flex: 1;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 40px 24px;
+  width: 100%;
+}
+
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.metaItem {
+  font-size: 13px;
+  color: #475569;
+}
+
+.metaDot {
+  color: #334155;
+}
+
+.errorBox {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 12px;
+  padding: 32px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.errorTitle {
+  font-size: 18px;
+  font-weight: 600;
+  color: #fca5a5;
+}
+
+.errorMsg {
+  font-size: 14px;
+  color: #94a3b8;
+  max-width: 480px;
+}
+
+.retryBtn {
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: #fca5a5;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 24px;
+  transition: background 0.2s;
+}
+
+.retryBtn:hover {
+  background: rgba(239, 68, 68, 0.25);
+}
+
+.footer {
+  border-top: 1px solid #1e293b;
+  padding: 16px 24px;
+  text-align: center;
+}
+
+.footer p {
+  font-size: 12px;
+  color: #334155;
+}

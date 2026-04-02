@@ -1,0 +1,70 @@
+.zone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 2px dashed #334155;
+  border-radius: 10px;
+  padding: 20px 16px;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  background: transparent;
+  user-select: none;
+}
+
+.zone:hover:not(.zoneDisabled) {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.zone:focus-visible {
+  outline: 2px solid #3b82f6;
+  outline-offset: 2px;
+}
+
+.dragging {
+  border-color: #3b82f6;
+  background: rgba(59, 130, 246, 0.08);
+}
+
+.zoneDisabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.icon {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.text {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.browse {
+  color: #3b82f6;
+  text-decoration: underline;
+}
+
+.parsing {
+  font-size: 13px;
+  color: #94a3b8;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.error {
+  font-size: 12px;
+  color: #f87171;
+  margin-top: 2px;
+}
