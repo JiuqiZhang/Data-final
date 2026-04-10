@@ -1,7 +1,21 @@
+from urllib.parse import urlparse, parse_qs
+
 from services import gemini_service
 
 
 PRIORITY_WEIGHT = {"high": 3.0, "medium": 2.0, "low": 1.0}
+_PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
+
+
+def _video_id(url: str) -> str:
+    """Return the YouTube video ID for youtube.com URLs, else the full URL."""
+    parsed = urlparse(url)
+    if "youtube.com" in parsed.netloc:
+        vid = parse_qs(parsed.query).get("v", [None])[0]
+        if vid:
+            return vid
+    return url
+
 
 LEVEL_ORDER = {"beginner": 0, "intermediate": 1, "advanced": 2}
 
@@ -45,8 +59,22 @@ async def build_learning_path(
     # Attach priority from the corresponding skill gap
     priority_map = {g["skill"].lower(): g["priority"] for g in skill_gaps}
     for r in all_resources:
-        skill_key = r.get("skill_addressed", "").lower()
-        r["priority"] = priority_map.get(skill_key, "low")
+        r["priority"] = priority_map.get(r.get("skill_addressed", "").lower(), "low")
+
+    # Sort high → medium → low so first occurrence wins for high-priority skills
+    all_resources.sort(key=lambda r: _PRIORITY_ORDER.get(r["priority"], 2))
+
+    # Deduplicate by video ID (YouTube) or URL — keep first (highest-priority) occurrence
+    seen: set[str] = set()
+    deduped: list[dict] = []
+    for r in all_resources:
+        key = _video_id(r.get("url", ""))
+        if key not in seen:
+            seen.add(key)
+            deduped.append(r)
+    all_resources = deduped
+
+    for r in all_resources:
         r["raw_score"] = _compute_score(r, r["priority"])
 
     # Gemini tagging for level + justification
