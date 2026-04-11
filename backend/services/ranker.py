@@ -32,11 +32,23 @@ def _video_id(url: str) -> str:
 
 def _infer_level_by_title(title: str) -> str:
     lower = title.lower()
-    if any(kw in lower for kw in ("introduction", "intro", "beginner", "fundamentals",
-                                   "basics", "getting started", "101")):
+    if any(kw in lower for kw in (
+        "introduction", "intro", "beginner", "fundamentals", "basics",
+        "getting started", "101", "crash course", "from scratch", "for beginners",
+        "zero to", "overview", "complete guide", "first steps",
+    )):
         return "beginner"
-    if any(kw in lower for kw in ("advanced", "deep dive", "research", "expert", "mastering")):
+    if any(kw in lower for kw in (
+        "advanced", "deep dive", "research", "expert", "mastering",
+        "optimization", "production", "at scale", "architecture", "internals",
+        "fine-tuning", "finetuning", "deployment", "best practices", "under the hood",
+    )):
         return "advanced"
+    if any(kw in lower for kw in (
+        "practical", "hands-on", "hands on", "project", "build", "implement",
+        "in practice", "real world", "in depth", "walkthrough", "applied",
+    )):
+        return "intermediate"
     return "intermediate"
 
 
@@ -121,8 +133,11 @@ async def build_learning_path(
 
     for i, r in enumerate(all_resources):
         tag = tag_map.get(i, {})
+        # Normalise Gemini output: lowercase + strip, then validate against known values
+        raw = tag.get("level", "")
+        gemini_level = raw.lower().strip() if raw.lower().strip() in LEVEL_ORDER else None
         r["level"] = (
-            tag.get("level")
+            gemini_level
             or r.get("level_hint")
             or _infer_level_by_title(r["title"])
         )

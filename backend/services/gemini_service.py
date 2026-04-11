@@ -110,11 +110,19 @@ async def tag_resources(skill_gaps: list[dict], resources: list[dict]) -> list[d
     if not resources:
         return []
 
-    prompt = f"""You are a curriculum designer.
+    prompt = f"""You are a curriculum designer classifying educational resources by difficulty level.
+
+Use these exact definitions — do not default to "intermediate" when unsure:
+- "beginner": assumes NO prior knowledge of the topic. Covers what it is and why it matters.
+  Typical signals: introduction, overview, crash course, from scratch, 101, for beginners.
+- "intermediate": assumes the viewer knows the basics and wants to apply them.
+  Typical signals: hands-on project, practical, building something real, in-depth walkthrough.
+- "advanced": assumes strong background. Covers architecture, optimization, production use,
+  edge cases, or research.
+  Typical signals: at scale, production, fine-tuning, internals, best practices, deep dive.
 
 For each resource below, provide:
-1. "level": one of "beginner", "intermediate", "advanced" based on the title and
-   typical prerequisite knowledge for this topic.
+1. "level": one of exactly "beginner", "intermediate", or "advanced" — lowercase, no other values.
 2. "justification": a 1-sentence explanation of why this resource helps address
    the listed skill gap. Be specific to the skill name.
 
