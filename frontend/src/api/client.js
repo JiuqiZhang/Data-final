@@ -2,7 +2,7 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || "http://localhost:8000",
-  timeout: 120000, // 2 minutes — pipeline can take time
+  timeout: 300000, // 5 minutes — enriched pipeline (YouTube + Wikiversity + 2x Gemini)
 });
 
 export async function analyzeResume(resumeText, jobDescription) {

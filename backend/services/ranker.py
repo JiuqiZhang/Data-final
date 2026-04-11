@@ -1,3 +1,4 @@
+import asyncio
 from urllib.parse import urlparse, parse_qs
 
 from services import gemini_service
@@ -115,7 +116,7 @@ async def build_learning_path(
     for r in all_resources:
         r["stage2_score"] = _compute_stage2_score(r)
 
-    # ── Gemini level tagging ─────────────────────────────────────────────────
+    # ── Gemini level tagging + Stage 3 description eval (parallel) ─────────────
     gemini_input = [
         {
             "index": i,
@@ -125,11 +126,23 @@ async def build_learning_path(
         }
         for i, r in enumerate(all_resources)
     ]
-    try:
-        tags = await gemini_service.tag_resources(skill_gaps, gemini_input)
-        tag_map = {t["resource_index"]: t for t in tags}
-    except Exception:
-        tag_map = {}
+    yt_resources = [
+        {
+            "resource_index": i,
+            "title": r["title"],
+            "description": r.get("description", "")[:800],  # trim for token budget
+            "skill_addressed": r.get("skill_addressed", ""),
+        }
+        for i, r in enumerate(all_resources)
+        if r.get("source") == "YouTube"
+    ]
+    tag_result, desc_result = await asyncio.gather(
+        gemini_service.tag_resources(skill_gaps, gemini_input),
+        gemini_service.evaluate_descriptions(skill_gaps, yt_resources),
+        return_exceptions=True,
+    )
+    tag_map = {t["resource_index"]: t for t in tag_result} if isinstance(tag_result, list) else {}
+    desc_map = {e["resource_index"]: e for e in desc_result} if isinstance(desc_result, list) else {}
 
     for i, r in enumerate(all_resources):
         tag = tag_map.get(i, {})
@@ -142,23 +155,6 @@ async def build_learning_path(
             or _infer_level_by_title(r["title"])
         )
         r["justification"] = tag.get("justification", "")
-
-    # ── Stage 3: LLM description evaluation (YouTube only) ──────────────────
-    yt_resources = [
-        {
-            "resource_index": i,
-            "title": r["title"],
-            "description": r.get("description", "")[:800],  # trim for token budget
-            "skill_addressed": r.get("skill_addressed", ""),
-        }
-        for i, r in enumerate(all_resources)
-        if r.get("source") == "YouTube"
-    ]
-    try:
-        desc_evals = await gemini_service.evaluate_descriptions(skill_gaps, yt_resources)
-        desc_map = {e["resource_index"]: e for e in desc_evals}
-    except Exception:
-        desc_map = {}
 
     for i, r in enumerate(all_resources):
         eval_result = desc_map.get(i, {})
