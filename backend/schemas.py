@@ -26,6 +26,8 @@ class ResourceOut(BaseModel):
     skill_addressed: Optional[str] = None
     justification: Optional[str] = None
     score: Optional[float] = None
+    description_score: Optional[float] = None   # LLM relevance score 0–10
+    description_reason: Optional[str] = None    # LLM reason why this was surfaced
 
     class Config:
         from_attributes = True

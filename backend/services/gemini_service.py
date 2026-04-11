@@ -64,6 +64,44 @@ JOB DESCRIPTION:
     return _parse_json(response.text)
 
 
+async def evaluate_descriptions(skill_gaps: list[dict], resources: list[dict]) -> list[dict]:
+    """
+    For each resource {index, title, description, skill_addressed},
+    evaluate whether the video description matches the skill gap.
+    Returns [{resource_index, relevance_score (0–10), reason}].
+    Only YouTube resources (with real descriptions) should be passed in.
+    """
+    if not resources:
+        return []
+
+    prompt = f"""You are evaluating educational videos for relevance to specific skill gaps.
+
+For each video below, evaluate: does the title and description demonstrate that this video
+genuinely teaches the listed skill_addressed?
+
+Return a JSON array in the same order as the input:
+[
+  {{
+    "resource_index": 0,
+    "relevance_score": 7,
+    "reason": "one sentence explaining the match or mismatch"
+  }}
+]
+
+Rules:
+- relevance_score is 0–10 (0 = completely off-topic, 10 = perfect match)
+- reason must be specific to the skill name, not generic
+
+SKILL GAPS (for context):
+{json.dumps(skill_gaps, indent=2)}
+
+VIDEOS:
+{json.dumps(resources, indent=2)}"""
+
+    response = _model.generate_content(prompt)
+    return _parse_json(response.text)
+
+
 async def tag_resources(skill_gaps: list[dict], resources: list[dict]) -> list[dict]:
     """
     Given skill gaps and a list of resources with {index, title, source, skill_addressed},

@@ -91,6 +91,8 @@ async def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
             skill_addressed=r.get("skill_addressed"),
             justification=r.get("justification"),
             raw_score=r.get("raw_score"),
+            description_score=r.get("description_score"),
+            description_reason=r.get("description_reason"),
         ))
 
     db.commit()
@@ -112,6 +114,8 @@ async def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
                 skill_addressed=r.get("skill_addressed"),
                 justification=r.get("justification"),
                 score=r.get("raw_score"),
+                description_score=r.get("description_score"),
+                description_reason=r.get("description_reason"),
             )
             for r in learning_path
         ],
