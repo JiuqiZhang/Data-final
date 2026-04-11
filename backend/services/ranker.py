@@ -68,6 +68,7 @@ async def build_learning_path(
     all_resources: list[dict],
     skill_gaps: list[dict],
     max_per_level: int = 5,
+    max_per_gap: int = 2,
 ) -> list[dict]:
     """
     Three-stage pipeline:
@@ -165,7 +166,16 @@ async def build_learning_path(
     ranked: list[dict] = []
     for lvl in ("beginner", "intermediate", "advanced"):
         sorted_bucket = sorted(buckets[lvl], key=lambda x: x["raw_score"], reverse=True)
-        ranked.extend(sorted_bucket[:max_per_level])
+        gap_counts: dict[str, int] = {}
+        selected: list[dict] = []
+        for r in sorted_bucket:
+            if len(selected) >= max_per_level:
+                break
+            skill = r.get("skill_addressed", "")
+            if gap_counts.get(skill, 0) < max_per_gap:
+                selected.append(r)
+                gap_counts[skill] = gap_counts.get(skill, 0) + 1
+        ranked.extend(selected)
 
     for i, r in enumerate(ranked):
         r["rank"] = i + 1
