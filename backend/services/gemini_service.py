@@ -22,7 +22,9 @@ def _parse_json(text: str):
 
 async def extract_skill_gaps(resume_text: str, job_description: str) -> dict:
     """
-    Returns {resume_skills, jd_skills, skill_gaps: [{skill, category, priority}]}
+    Returns {resume_skills, jd_skills, skill_gaps, education_level}
+    skill_gaps: [{skill, category, priority}] — technical gaps only, no soft skills.
+    education_level: "bachelor" | "master" | "phd"
     """
     prompt = f"""You are a professional technical recruiter and skills assessor.
 
@@ -31,13 +33,20 @@ Your tasks:
 2. Extract all required and preferred technical skills from the job description.
 3. Identify the SKILL GAPS: skills in the job description that are absent or
    insufficiently demonstrated in the resume.
+   IMPORTANT: Only include technical and domain-specific skill gaps.
+   Do NOT include soft skills such as communication, teamwork, leadership,
+   collaboration, responsibility, problem-solving, or interpersonal skills.
 4. For each skill gap, assign a priority:
    - "high"   → listed as required or mentioned multiple times in the JD
    - "medium" → listed as preferred or mentioned once
    - "low"    → implied by context but not stated explicitly
 5. For each skill gap, assign a category from:
    ["Programming Language", "ML/AI Framework", "Big Data", "Statistics",
-    "Database", "Data Visualization", "Cloud/DevOps", "Soft Skill", "Other"]
+    "Database", "Data Visualization", "Cloud/DevOps", "Other"]
+6. Identify the candidate's highest education level from the resume:
+   - "phd"     → PhD, doctorate, DPhil, or equivalent research degree
+   - "master"  → Master's degree (MS, MA, MEng, MBA, etc.)
+   - "bachelor" → Bachelor's degree or below, or no degree mentioned
 
 Return a JSON object with this exact schema:
 {{
@@ -49,7 +58,8 @@ Return a JSON object with this exact schema:
       "category": "string",
       "priority": "high | medium | low"
     }}
-  ]
+  ],
+  "education_level": "bachelor | master | phd"
 }}
 
 RESUME:

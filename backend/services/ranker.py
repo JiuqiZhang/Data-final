@@ -23,6 +23,14 @@ LEVEL_ORDER = {"beginner": 0, "intermediate": 1, "advanced": 2}
 # Resources below this blended score are dropped regardless of level bucket
 MIN_SCORE_THRESHOLD = 0.55
 
+# Max resources per level per education level.
+# PhD → fewer beginner slots, more advanced; Bachelor → more beginner slots.
+_LEVEL_CAPS: dict[str, dict[str, int]] = {
+    "bachelor": {"beginner": 5, "intermediate": 5, "advanced": 3},
+    "master":   {"beginner": 3, "intermediate": 5, "advanced": 5},
+    "phd":      {"beginner": 1, "intermediate": 4, "advanced": 5},
+}
+
 
 def _video_id(url: str) -> str:
     """Return the YouTube video ID for youtube.com URLs, else the full URL."""
@@ -91,7 +99,7 @@ def _compute_stage2_score(resource: dict) -> float:
 async def build_learning_path(
     all_resources: list[dict],
     skill_gaps: list[dict],
-    max_per_level: int = 5,
+    education_level: str = "bachelor",
     max_per_gap: int = 2,
 ) -> list[dict]:
     """
@@ -100,8 +108,11 @@ async def build_learning_path(
       Stage 2 — 4-signal composite score (channel trust, title relevance,
                  engagement ratio, recency).
       Stage 3 — LLM evaluates video descriptions; blended into final score.
+    education_level ("bachelor"|"master"|"phd") adjusts how many beginner vs.
+    advanced slots are allocated in the final learning path.
     Returns list of resource dicts with rank, level, score, description_score, reason.
     """
+    level_caps = _LEVEL_CAPS.get(education_level, _LEVEL_CAPS["bachelor"])
     if not all_resources:
         return []
 
@@ -190,11 +201,12 @@ async def build_learning_path(
 
     ranked: list[dict] = []
     for lvl in ("beginner", "intermediate", "advanced"):
+        cap = level_caps[lvl]
         sorted_bucket = sorted(buckets[lvl], key=lambda x: x["raw_score"], reverse=True)
         gap_counts: dict[str, int] = {}
         selected: list[dict] = []
         for r in sorted_bucket:
-            if len(selected) >= max_per_level:
+            if len(selected) >= cap:
                 break
             skill = r.get("skill_addressed", "")
             if gap_counts.get(skill, 0) < max_per_gap:

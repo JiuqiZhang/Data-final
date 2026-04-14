@@ -136,6 +136,10 @@ async def search_oer(skill: str, max_results: int = 3) -> list[dict]:
 
     results = []
     for i, title in enumerate(titles):
+        # Skip pages whose titles contain non-Latin Unicode (non-English content)
+        if any(ord(c) > 0x024F for c in title if c.isalpha()):
+            continue
+
         url_title = title.replace(" ", "_")
         last_edited = revision_map.get(title, "")
         views = view_results[i] if isinstance(view_results[i], int) else 0

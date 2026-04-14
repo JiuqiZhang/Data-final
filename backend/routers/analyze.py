@@ -26,6 +26,7 @@ async def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Skill extraction failed: {str(e)}")
 
     skill_gaps = extraction.get("skill_gaps", [])
+    education_level = extraction.get("education_level", "bachelor")
     if not skill_gaps:
         raise HTTPException(
             status_code=200,
@@ -72,7 +73,9 @@ async def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
 
     # Step 3: Rank and tag resources
     try:
-        learning_path = await ranker.build_learning_path(all_resources, skill_gaps)
+        learning_path = await ranker.build_learning_path(
+            all_resources, skill_gaps, education_level=education_level
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ranking failed: {str(e)}")
 
