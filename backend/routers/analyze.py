@@ -41,7 +41,11 @@ async def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
         yt_adv_task = youtube_service.search_youtube(
             skill, category=category, max_results=4, advanced=True
         )
-        oer_task = oer_service.search_oer(skill)
+        # Wikiversity has no useful content for soft skills — skip it to avoid
+        # irrelevant corporate/lifestyle results for skills like Responsibility
+        fetch_oer = category != "Soft Skill"
+        oer_task = oer_service.search_oer(skill) if fetch_oer else asyncio.sleep(0)
+
         yt_results, yt_adv_results, oer_results = await asyncio.gather(
             yt_task, yt_adv_task, oer_task, return_exceptions=True
         )

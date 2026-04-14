@@ -11,6 +11,22 @@ WIKIVERSITY_UA = "SkillArchitect/1.0 (educational skill-gap finder; https://gith
 # Normalisation cap: 3000 total views over 3 months ≈ 1.0 engagement
 _PAGEVIEW_NORM_CAP = 3000
 
+# Same disambiguation table as youtube_service — maps ambiguous skill names to
+# unambiguous search terms so e.g. "Go" doesn't match "Should we go vegan?"
+_SKILL_SEARCH_OVERRIDES: dict[str, str] = {
+    "go":    "Golang programming language",
+    "r":     "R programming language statistics",
+    "c":     "C programming language",
+    "rust":  "Rust programming language systems",
+    "swift": "Swift iOS programming",
+    "julia": "Julia programming language",
+    "scala": "Scala programming language",
+}
+
+
+def _build_oer_query(skill: str) -> str:
+    return _SKILL_SEARCH_OVERRIDES.get(skill.lower(), skill)
+
 
 def _recency_score(timestamp: str) -> float:
     """Linear decay over 3 years from last edit timestamp."""
@@ -60,11 +76,13 @@ async def search_oer(skill: str, max_results: int = 3) -> list[dict]:
       2. Batch-fetch last revision timestamp (recency signal).
       3. Concurrent pageviews fetch per article (engagement signal).
     """
+    query = _build_oer_query(skill)
+
     # Step 1 — search
     search_params = {
         "action": "query",
         "list": "search",
-        "srsearch": skill,
+        "srsearch": query,
         "srnamespace": 0,
         "srlimit": max_results,
         "format": "json",
