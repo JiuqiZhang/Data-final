@@ -38,6 +38,9 @@ class AnalysisResponse(BaseModel):
     skill_gaps: List[SkillGapOut]
     learning_path: List[ResourceOut]
     created_at: datetime
+    education_level: Optional[str] = None   # bachelor | master | phd
+    message: Optional[str] = None           # set when no skill gaps were found
+    warnings: List[str] = []               # non-fatal notices (e.g. degraded Gemini scoring)
 
     class Config:
         from_attributes = True

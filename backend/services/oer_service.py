@@ -148,7 +148,7 @@ async def search_oer(skill: str, max_results: int = 3) -> list[dict]:
             "title": title,
             "source": "Wikiversity",
             "url": f"https://en.wikiversity.org/wiki/{url_title}",
-            "source_trust": 0.85,
+            "source_trust": 0.65,
             "recency_score": _recency_score(last_edited),
             "engagement_ratio": _engagement_ratio(views),
         })

@@ -1,11 +1,47 @@
 import os
 import re
+import time
+from collections import OrderedDict
 from datetime import datetime, timezone
 
 import httpx
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# ── Simple in-process TTL cache (LRU eviction, 1-hour expiry) ───────────────
+_CACHE_TTL = 3600        # seconds
+_CACHE_MAXSIZE = 128     # (skill, category, advanced) tuples
+
+
+class _TTLCache:
+    """OrderedDict-backed LRU cache with per-entry TTL."""
+
+    def __init__(self, maxsize: int, ttl: float) -> None:
+        self._maxsize = maxsize
+        self._ttl = ttl
+        self._store: OrderedDict = OrderedDict()
+
+    def get(self, key):
+        entry = self._store.get(key)
+        if entry is None:
+            return None
+        value, expiry = entry
+        if time.monotonic() > expiry:
+            del self._store[key]
+            return None
+        self._store.move_to_end(key)  # refresh LRU position
+        return value
+
+    def set(self, key, value) -> None:
+        if key in self._store:
+            self._store.move_to_end(key)
+        self._store[key] = (value, time.monotonic() + self._ttl)
+        while len(self._store) > self._maxsize:
+            self._store.popitem(last=False)  # evict oldest
+
+
+_search_cache = _TTLCache(maxsize=_CACHE_MAXSIZE, ttl=_CACHE_TTL)
 
 YOUTUBE_API_KEY = os.getenv("YOUTUBE_API_KEY")
 YOUTUBE_SEARCH_URL = "https://www.googleapis.com/youtube/v3/search"
@@ -164,11 +200,16 @@ async def search_youtube(
     """
     Two-step fetch: search for video IDs, then fetch full details.
     Applies hard pre-filters before returning enriched resource dicts.
-    category is used to build a more specific, unambiguous query.
-    Set advanced=True to fetch advanced-level content for the skill.
+    Results are cached in-process for _CACHE_TTL seconds to avoid burning
+    YouTube quota on repeated analyses of the same skill.
     """
     if not YOUTUBE_API_KEY:
         return []
+
+    cache_key = (skill.lower(), category, advanced)
+    cached = _search_cache.get(cache_key)
+    if cached is not None:
+        return cached
 
     query = _build_query(skill, category, advanced=advanced)
     keywords = _content_keywords(skill, category)
@@ -240,4 +281,5 @@ async def search_youtube(
             "description": description,
         })
 
+    _search_cache.set(cache_key, results)
     return results

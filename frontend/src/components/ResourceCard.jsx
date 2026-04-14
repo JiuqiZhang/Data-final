@@ -51,7 +51,8 @@ export default function ResourceCard({ resource, index }) {
       <div className={styles.footer}>
         {resource.score != null && (
           <span className={styles.score}>
-            Relevance score: {resource.score.toFixed(2)}
+            Match quality:{" "}
+            {resource.score >= 0.75 ? "High" : resource.score >= 0.60 ? "Medium" : "Low"}
           </span>
         )}
         <a

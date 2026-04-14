@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -28,9 +29,21 @@ async def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
     skill_gaps = extraction.get("skill_gaps", [])
     education_level = extraction.get("education_level", "bachelor")
     if not skill_gaps:
-        raise HTTPException(
-            status_code=200,
-            detail="No skill gaps detected — your resume already covers the job requirements!",
+        # Persist the analysis so it appears in history, then return a clean 200
+        db_analysis = Analysis(
+            resume_text=request.resume_text,
+            job_description=request.job_description,
+        )
+        db.add(db_analysis)
+        db.commit()
+        db.refresh(db_analysis)
+        return AnalysisResponse(
+            analysis_id=db_analysis.id,
+            skill_gaps=[],
+            learning_path=[],
+            created_at=db_analysis.created_at,
+            education_level=education_level,
+            message="No skill gaps detected — your resume already covers the job requirements!",
         )
 
     # Step 2: Fetch resources for each skill gap in parallel
@@ -73,7 +86,7 @@ async def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
 
     # Step 3: Rank and tag resources
     try:
-        learning_path = await ranker.build_learning_path(
+        learning_path, warnings = await ranker.build_learning_path(
             all_resources, skill_gaps, education_level=education_level
         )
     except Exception as e:
@@ -135,4 +148,6 @@ async def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
             for r in learning_path
         ],
         created_at=db_analysis.created_at,
+        education_level=education_level,
+        warnings=warnings,
     )

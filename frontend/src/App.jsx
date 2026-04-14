@@ -57,9 +57,36 @@ export default function App() {
               <span className={styles.metaItem}>
                 {new Date(result.created_at).toLocaleString()}
               </span>
+              {result.education_level && (
+                <>
+                  <span className={styles.metaDot}>·</span>
+                  <span className={styles.metaItem}>
+                    Detected level:{" "}
+                    <strong>
+                      {result.education_level.charAt(0).toUpperCase() +
+                        result.education_level.slice(1)}
+                    </strong>
+                  </span>
+                </>
+              )}
             </div>
-            <SkillGapSummary skillGaps={result.skill_gaps} />
-            <LearningPath learningPath={result.learning_path} />
+            {result.warnings?.length > 0 && (
+              <div className={styles.warningBox}>
+                {result.warnings.map((w, i) => (
+                  <p key={i} className={styles.warningMsg}>{w}</p>
+                ))}
+              </div>
+            )}
+            {result.message ? (
+              <div className={styles.noGapsBox}>
+                <p className={styles.noGapsMsg}>{result.message}</p>
+              </div>
+            ) : (
+              <>
+                <SkillGapSummary skillGaps={result.skill_gaps} />
+                <LearningPath learningPath={result.learning_path} />
+              </>
+            )}
           </div>
         )}
       </main>

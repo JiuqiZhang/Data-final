@@ -1,7 +1,10 @@
 import asyncio
+import logging
 from urllib.parse import urlparse, parse_qs
 
 from services import gemini_service
+
+logger = logging.getLogger(__name__)
 
 
 # ── Scoring weights (Stage 2 composite) ─────────────────────────────────────
@@ -101,7 +104,7 @@ async def build_learning_path(
     skill_gaps: list[dict],
     education_level: str = "bachelor",
     max_per_gap: int = 2,
-) -> list[dict]:
+) -> tuple[list[dict], list[str]]:
     """
     Three-stage pipeline:
       Stage 1 — hard pre-filters already applied in youtube_service.search_youtube.
@@ -110,11 +113,13 @@ async def build_learning_path(
       Stage 3 — LLM evaluates video descriptions; blended into final score.
     education_level ("bachelor"|"master"|"phd") adjusts how many beginner vs.
     advanced slots are allocated in the final learning path.
-    Returns list of resource dicts with rank, level, score, description_score, reason.
+    Returns (ranked_resources, warnings) where warnings is a list of user-facing
+    notices about any degraded scoring due to Gemini failures.
     """
     level_caps = _LEVEL_CAPS.get(education_level, _LEVEL_CAPS["bachelor"])
+    warnings: list[str] = []
     if not all_resources:
-        return []
+        return [], warnings
 
     # Attach priority from the corresponding skill gap
     priority_map = {g["skill"].lower(): g["priority"] for g in skill_gaps}
@@ -163,19 +168,31 @@ async def build_learning_path(
         gemini_service.evaluate_descriptions(skill_gaps, yt_resources),
         return_exceptions=True,
     )
-    tag_map = {t["resource_index"]: t for t in tag_result} if isinstance(tag_result, list) else {}
-    desc_map = {e["resource_index"]: e for e in desc_result} if isinstance(desc_result, list) else {}
+
+    if isinstance(tag_result, Exception):
+        logger.warning("tag_resources failed (%s: %s)", type(tag_result).__name__, tag_result)
+        warnings.append(
+            "Difficulty level tagging was unavailable — levels shown are estimated from titles."
+        )
+        tag_map: dict = {}
+    else:
+        tag_map = {t["resource_index"]: t for t in tag_result} if isinstance(tag_result, list) else {}
+
+    if isinstance(desc_result, Exception):
+        logger.warning("evaluate_descriptions failed (%s: %s)", type(desc_result).__name__, desc_result)
+        warnings.append(
+            "Relevance scoring was unavailable — match quality is based on title signals only."
+        )
+        desc_map: dict = {}
+    else:
+        desc_map = {e["resource_index"]: e for e in desc_result} if isinstance(desc_result, list) else {}
 
     for i, r in enumerate(all_resources):
         tag = tag_map.get(i, {})
         # Normalise Gemini output: lowercase + strip, then validate against known values
         raw = tag.get("level", "")
         gemini_level = raw.lower().strip() if raw.lower().strip() in LEVEL_ORDER else None
-        r["level"] = (
-            gemini_level
-            or r.get("level_hint")
-            or _infer_level_by_title(r["title"])
-        )
+        r["level"] = gemini_level or _infer_level_by_title(r["title"])
         r["justification"] = tag.get("justification", "")
 
     for i, r in enumerate(all_resources):
@@ -217,4 +234,4 @@ async def build_learning_path(
     for i, r in enumerate(ranked):
         r["rank"] = i + 1
 
-    return ranked
+    return ranked, warnings
