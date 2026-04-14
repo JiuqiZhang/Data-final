@@ -42,12 +42,39 @@ _QUERY_STOPWORDS = frozenset({
     "for", "and", "the", "in", "a",
 })
 
+# Regex to detect titles that are explicitly in a non-English language
+_NON_ENGLISH_PATTERN = re.compile(
+    r'\|\s*(?:hindi|malayalam|tamil|telugu|kannada|bengali|urdu|arabic|español|'
+    r'français|deutsch|português|italiano|türkçe|punjabi|gujarati|marathi|'
+    r'sinhala|thai|vietnamese|indonesia|bahasa)\b'
+    r'|'
+    r'\bin\s+(?:hindi|malayalam|tamil|telugu|kannada|bengali|urdu|arabic|español|'
+    r'français|deutsch|português|italiano|türkçe|punjabi|gujarati|marathi)\b',
+    re.IGNORECASE,
+)
 
-def _build_query(skill: str, category: str = "") -> str:
+
+def _is_likely_english(title: str) -> bool:
+    """Return False if the title is clearly in a non-English language."""
+    # Non-Latin Unicode letters → non-English script
+    if any(ord(c) > 0x024F for c in title if c.isalpha()):
+        return False
+    # Explicit "in <language>" or "| <language>" marker
+    if _NON_ENGLISH_PATTERN.search(title):
+        return False
+    return True
+
+
+def _build_query(skill: str, category: str = "", advanced: bool = False) -> str:
     """Return an unambiguous YouTube search query for the given skill + category."""
     override = _SKILL_QUERY_OVERRIDES.get(skill.lower())
+    base = override if override else skill
+    if advanced:
+        if category == "Soft Skill":
+            return f"{skill} advanced professional strategies leadership"
+        return f"{base} advanced best practices production"
     if override:
-        return f"{override} tutorial"
+        return f"{base} tutorial"
     if category == "Soft Skill":
         return f"{skill} professional development skills"
     if category == "Programming Language":
@@ -113,6 +140,8 @@ def _has_keyword_overlap(title: str, keywords: set[str]) -> bool:
 
 def _passes_prefilter(title: str, keywords: set[str], duration_seconds: int,
                       published_at: str, view_count: int) -> bool:
+    if not _is_likely_english(title):
+        return False
     if duration_seconds < MIN_DURATION_SECONDS:
         return False
     try:
@@ -129,16 +158,19 @@ def _passes_prefilter(title: str, keywords: set[str], duration_seconds: int,
     return True
 
 
-async def search_youtube(skill: str, category: str = "", max_results: int = 8) -> list[dict]:
+async def search_youtube(
+    skill: str, category: str = "", max_results: int = 8, advanced: bool = False
+) -> list[dict]:
     """
     Two-step fetch: search for video IDs, then fetch full details.
     Applies hard pre-filters before returning enriched resource dicts.
     category is used to build a more specific, unambiguous query.
+    Set advanced=True to fetch advanced-level content for the skill.
     """
     if not YOUTUBE_API_KEY:
         return []
 
-    query = _build_query(skill, category)
+    query = _build_query(skill, category, advanced=advanced)
     keywords = _content_keywords(skill, category)
 
     # Step 1 — search, retrieve only IDs

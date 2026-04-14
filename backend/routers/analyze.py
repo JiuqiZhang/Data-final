@@ -35,15 +35,23 @@ async def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
     # Step 2: Fetch resources for each skill gap in parallel
     async def fetch_for_gap(gap: dict) -> list[dict]:
         skill = gap["skill"]
-        yt_task = youtube_service.search_youtube(skill, category=gap.get("category", ""))
+        category = gap.get("category", "")
+        # Run general, advanced, and OER searches concurrently
+        yt_task = youtube_service.search_youtube(skill, category=category, max_results=6)
+        yt_adv_task = youtube_service.search_youtube(
+            skill, category=category, max_results=4, advanced=True
+        )
         oer_task = oer_service.search_oer(skill)
-        yt_results, oer_results = await asyncio.gather(yt_task, oer_task, return_exceptions=True)
+        yt_results, yt_adv_results, oer_results = await asyncio.gather(
+            yt_task, yt_adv_task, oer_task, return_exceptions=True
+        )
 
         resources = []
-        if isinstance(yt_results, list):
-            for r in yt_results:
-                r["skill_addressed"] = skill
-                resources.append(r)
+        for result in (yt_results, yt_adv_results):
+            if isinstance(result, list):
+                for r in result:
+                    r["skill_addressed"] = skill
+                    resources.append(r)
         if isinstance(oer_results, list):
             for r in oer_results:
                 r["skill_addressed"] = skill

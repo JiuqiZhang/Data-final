@@ -20,6 +20,9 @@ _PRIORITY_ORDER = {"high": 0, "medium": 1, "low": 2}
 
 LEVEL_ORDER = {"beginner": 0, "intermediate": 1, "advanced": 2}
 
+# Resources below this blended score are dropped regardless of level bucket
+MIN_SCORE_THRESHOLD = 0.55
+
 
 def _video_id(url: str) -> str:
     """Return the YouTube video ID for youtube.com URLs, else the full URL."""
@@ -173,6 +176,9 @@ async def build_learning_path(
         llm_norm = llm_score / 10.0
         r["raw_score"] = (STAGE2_WEIGHT * r["stage2_score"]
                           + (1 - STAGE2_WEIGHT) * llm_norm)
+
+    # ── Drop resources below minimum quality threshold ───────────────────────
+    all_resources = [r for r in all_resources if r.get("raw_score", 0) >= MIN_SCORE_THRESHOLD]
 
     # ── Bucket by level, cap per level ──────────────────────────────────────
     buckets: dict[str, list] = {"beginner": [], "intermediate": [], "advanced": []}
