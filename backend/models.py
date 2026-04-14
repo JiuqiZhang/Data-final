@@ -41,5 +41,7 @@ class Resource(Base):
     skill_addressed = Column(String)
     justification = Column(Text)
     raw_score = Column(Float)
+    description_score = Column(Float)       # Stage 3 LLM relevance score (0–10)
+    description_reason = Column(Text)       # Stage 3 LLM reason string
 
     analysis = relationship("Analysis", back_populates="resources")

@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -26,24 +27,49 @@ async def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail=f"Skill extraction failed: {str(e)}")
 
     skill_gaps = extraction.get("skill_gaps", [])
+    education_level = extraction.get("education_level", "bachelor")
     if not skill_gaps:
-        raise HTTPException(
-            status_code=200,
-            detail="No skill gaps detected — your resume already covers the job requirements!",
+        # Persist the analysis so it appears in history, then return a clean 200
+        db_analysis = Analysis(
+            resume_text=request.resume_text,
+            job_description=request.job_description,
+        )
+        db.add(db_analysis)
+        db.commit()
+        db.refresh(db_analysis)
+        return AnalysisResponse(
+            analysis_id=db_analysis.id,
+            skill_gaps=[],
+            learning_path=[],
+            created_at=db_analysis.created_at,
+            education_level=education_level,
+            message="No skill gaps detected — your resume already covers the job requirements!",
         )
 
     # Step 2: Fetch resources for each skill gap in parallel
     async def fetch_for_gap(gap: dict) -> list[dict]:
         skill = gap["skill"]
-        yt_task = youtube_service.search_youtube(skill)
-        oer_task = oer_service.search_oer(skill)
-        yt_results, oer_results = await asyncio.gather(yt_task, oer_task, return_exceptions=True)
+        category = gap.get("category", "")
+        # Run general, advanced, and OER searches concurrently
+        yt_task = youtube_service.search_youtube(skill, category=category, max_results=6)
+        yt_adv_task = youtube_service.search_youtube(
+            skill, category=category, max_results=4, advanced=True
+        )
+        # Wikiversity has no useful content for soft skills — skip it to avoid
+        # irrelevant corporate/lifestyle results for skills like Responsibility
+        fetch_oer = category != "Soft Skill"
+        oer_task = oer_service.search_oer(skill) if fetch_oer else asyncio.sleep(0)
+
+        yt_results, yt_adv_results, oer_results = await asyncio.gather(
+            yt_task, yt_adv_task, oer_task, return_exceptions=True
+        )
 
         resources = []
-        if isinstance(yt_results, list):
-            for r in yt_results:
-                r["skill_addressed"] = skill
-                resources.append(r)
+        for result in (yt_results, yt_adv_results):
+            if isinstance(result, list):
+                for r in result:
+                    r["skill_addressed"] = skill
+                    resources.append(r)
         if isinstance(oer_results, list):
             for r in oer_results:
                 r["skill_addressed"] = skill
@@ -60,7 +86,9 @@ async def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
 
     # Step 3: Rank and tag resources
     try:
-        learning_path = await ranker.build_learning_path(all_resources, skill_gaps)
+        learning_path, warnings = await ranker.build_learning_path(
+            all_resources, skill_gaps, education_level=education_level
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Ranking failed: {str(e)}")
 
@@ -91,6 +119,8 @@ async def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
             skill_addressed=r.get("skill_addressed"),
             justification=r.get("justification"),
             raw_score=r.get("raw_score"),
+            description_score=r.get("description_score"),
+            description_reason=r.get("description_reason"),
         ))
 
     db.commit()
@@ -112,8 +142,12 @@ async def analyze(request: AnalyzeRequest, db: Session = Depends(get_db)):
                 skill_addressed=r.get("skill_addressed"),
                 justification=r.get("justification"),
                 score=r.get("raw_score"),
+                description_score=r.get("description_score"),
+                description_reason=r.get("description_reason"),
             )
             for r in learning_path
         ],
         created_at=db_analysis.created_at,
+        education_level=education_level,
+        warnings=warnings,
     )

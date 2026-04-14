@@ -26,6 +26,8 @@ class ResourceOut(BaseModel):
     skill_addressed: Optional[str] = None
     justification: Optional[str] = None
     score: Optional[float] = None
+    description_score: Optional[float] = None   # LLM relevance score 0–10
+    description_reason: Optional[str] = None    # LLM reason why this was surfaced
 
     class Config:
         from_attributes = True
@@ -36,6 +38,9 @@ class AnalysisResponse(BaseModel):
     skill_gaps: List[SkillGapOut]
     learning_path: List[ResourceOut]
     created_at: datetime
+    education_level: Optional[str] = None   # bachelor | master | phd
+    message: Optional[str] = None           # set when no skill gaps were found
+    warnings: List[str] = []               # non-fatal notices (e.g. degraded Gemini scoring)
 
     class Config:
         from_attributes = True
