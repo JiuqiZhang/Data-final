@@ -58,7 +58,15 @@ def _title_relevance(title: str, skill: str) -> float:
     title_tokens = set(title.lower().split())
     if not skill_tokens:
         return 0.0
-    return len(skill_tokens & title_tokens) / len(skill_tokens)
+    direct = len(skill_tokens & title_tokens) / len(skill_tokens)
+    if direct > 0:
+        return direct
+    # Partial credit: skill token is a prefix of a title token (e.g. "go" → "golang")
+    partial = sum(
+        1 for s in skill_tokens
+        if any(t.startswith(s) or s.startswith(t) for t in title_tokens)
+    )
+    return 0.7 * partial / len(skill_tokens)
 
 
 def _compute_stage2_score(resource: dict) -> float:

@@ -1,22 +1,20 @@
 import json
 import os
 import re
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 
 load_dotenv()
 
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-_model = genai.GenerativeModel(
-    model_name="gemini-2.5-flash",
-    generation_config={"response_mime_type": "application/json"},
-)
+_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+_MODEL = "gemini-2.5-flash"
+_CONFIG = types.GenerateContentConfig(response_mime_type="application/json")
 
 
 def _parse_json(text: str):
     """Parse JSON from model response, stripping markdown code fences if present."""
     text = text.strip()
-    # Strip ```json ... ``` or ``` ... ```
     text = re.sub(r"^```(?:json)?\s*", "", text)
     text = re.sub(r"\s*```$", "", text)
     return json.loads(text.strip())
@@ -60,7 +58,9 @@ RESUME:
 JOB DESCRIPTION:
 {job_description}"""
 
-    response = _model.generate_content(prompt)
+    response = await _client.aio.models.generate_content(
+        model=_MODEL, contents=prompt, config=_CONFIG
+    )
     return _parse_json(response.text)
 
 
@@ -74,10 +74,10 @@ async def evaluate_descriptions(skill_gaps: list[dict], resources: list[dict]) -
     if not resources:
         return []
 
-    prompt = f"""You are evaluating educational videos for relevance to specific skill gaps.
+    prompt = f"""You are evaluating educational videos for relevance to specific skill gaps in a technology/data career context.
 
 For each video below, evaluate: does the title and description demonstrate that this video
-genuinely teaches the listed skill_addressed?
+genuinely teaches the listed skill_addressed for a software/data professional?
 
 Return a JSON array in the same order as the input:
 [
@@ -91,6 +91,12 @@ Return a JSON array in the same order as the input:
 Rules:
 - relevance_score is 0–10 (0 = completely off-topic, 10 = perfect match)
 - reason must be specific to the skill name, not generic
+- Score 0–2 if the video is from an entirely unrelated domain (e.g., cooking, fitness,
+  video editing software, lifestyle, or corporate law/auditing) even if the skill keyword
+  appears in the title. The skill must be taught in a tech, software, or professional
+  development context relevant to the skill gaps provided.
+- For soft skills (communication, collaboration, responsibility, etc.), the content must
+  be professional/workplace focused — not lifestyle, cooking, video production, etc.
 
 SKILL GAPS (for context):
 {json.dumps(skill_gaps, indent=2)}
@@ -98,7 +104,9 @@ SKILL GAPS (for context):
 VIDEOS:
 {json.dumps(resources, indent=2)}"""
 
-    response = _model.generate_content(prompt)
+    response = await _client.aio.models.generate_content(
+        model=_MODEL, contents=prompt, config=_CONFIG
+    )
     return _parse_json(response.text)
 
 
@@ -141,5 +149,7 @@ SKILL GAPS (for context):
 RESOURCES:
 {json.dumps(resources, indent=2)}"""
 
-    response = _model.generate_content(prompt)
+    response = await _client.aio.models.generate_content(
+        model=_MODEL, contents=prompt, config=_CONFIG
+    )
     return _parse_json(response.text)

@@ -24,6 +24,50 @@ MIN_DURATION_SECONDS = 180   # 3 minutes
 MAX_AGE_YEARS = 3
 MIN_VIEWS = 1_000
 
+# Skills whose names are common English words — map to unambiguous search terms
+_SKILL_QUERY_OVERRIDES: dict[str, str] = {
+    "go":     "Golang programming language",
+    "r":      "R programming language statistics",
+    "c":      "C programming language",
+    "rust":   "Rust programming language systems",
+    "swift":  "Swift iOS programming",
+    "julia":  "Julia programming language data science",
+    "scala":  "Scala programming language",
+}
+
+# Generic words that appear in queries but shouldn't count as "content" keywords
+_QUERY_STOPWORDS = frozenset({
+    "tutorial", "course", "learn", "guide", "skills", "professional",
+    "development", "programming", "language", "introduction", "beginner",
+    "for", "and", "the", "in", "a",
+})
+
+
+def _build_query(skill: str, category: str = "") -> str:
+    """Return an unambiguous YouTube search query for the given skill + category."""
+    override = _SKILL_QUERY_OVERRIDES.get(skill.lower())
+    if override:
+        return f"{override} tutorial"
+    if category == "Soft Skill":
+        return f"{skill} professional development skills"
+    if category == "Programming Language":
+        return f"{skill} programming tutorial"
+    return f"{skill} tutorial"
+
+
+def _content_keywords(skill: str, category: str = "") -> set[str]:
+    """
+    Return the meaningful content keywords used to verify title overlap.
+    Uses the disambiguated form (e.g. 'golang' for skill 'Go') so that
+    common English words don't produce false positives.
+    """
+    override = _SKILL_QUERY_OVERRIDES.get(skill.lower())
+    if override:
+        tokens = set(override.lower().split()) - _QUERY_STOPWORDS
+        if tokens:
+            return tokens
+    return set(skill.lower().split()) - _QUERY_STOPWORDS or {skill.lower()}
+
 
 def _source_trust(channel_title: str) -> float:
     lower = channel_title.lower()
@@ -61,13 +105,13 @@ def _recency_score(published_at: str) -> float:
         return 0.5
 
 
-def _has_keyword_overlap(title: str, skill: str) -> bool:
-    skill_tokens = set(skill.lower().split())
-    title_tokens = set(title.lower().split())
-    return bool(skill_tokens & title_tokens)
+def _has_keyword_overlap(title: str, keywords: set[str]) -> bool:
+    """Return True if any content keyword appears in the title."""
+    title_tokens = set(re.split(r"\W+", title.lower()))
+    return bool(keywords & title_tokens)
 
 
-def _passes_prefilter(title: str, skill: str, duration_seconds: int,
+def _passes_prefilter(title: str, keywords: set[str], duration_seconds: int,
                       published_at: str, view_count: int) -> bool:
     if duration_seconds < MIN_DURATION_SECONDS:
         return False
@@ -80,23 +124,27 @@ def _passes_prefilter(title: str, skill: str, duration_seconds: int,
         pass
     if view_count < MIN_VIEWS:
         return False
-    if not _has_keyword_overlap(title, skill):
+    if not _has_keyword_overlap(title, keywords):
         return False
     return True
 
 
-async def search_youtube(skill: str, max_results: int = 8) -> list[dict]:
+async def search_youtube(skill: str, category: str = "", max_results: int = 8) -> list[dict]:
     """
     Two-step fetch: search for video IDs, then fetch full details.
     Applies hard pre-filters before returning enriched resource dicts.
+    category is used to build a more specific, unambiguous query.
     """
     if not YOUTUBE_API_KEY:
         return []
 
+    query = _build_query(skill, category)
+    keywords = _content_keywords(skill, category)
+
     # Step 1 — search, retrieve only IDs
     search_params = {
         "part": "id",
-        "q": f"{skill} tutorial",
+        "q": query,
         "type": "video",
         "maxResults": max_results,
         "relevanceLanguage": "en",
@@ -143,7 +191,7 @@ async def search_youtube(skill: str, max_results: int = 8) -> list[dict]:
         like_count = int(stats.get("likeCount", 0))
         duration_seconds = _parse_duration_seconds(content.get("duration", ""))
 
-        if not _passes_prefilter(title, skill, duration_seconds, published_at, view_count):
+        if not _passes_prefilter(title, keywords, duration_seconds, published_at, view_count):
             continue
 
         results.append({
